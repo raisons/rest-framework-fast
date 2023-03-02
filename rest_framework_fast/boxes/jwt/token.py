@@ -1,25 +1,23 @@
 #!/usr/bin/env python
-from typing import Union
+from typing import Union, Dict, Any
 from datetime import datetime, timedelta
 from authlib.jose import JsonWebToken
 from authlib.jose import BaseClaims, JWTClaims
-from authlib.jose.errors import DecodeError
+from authlib.jose.errors import JoseError as TokenError  # noqa
+from authlib.jose.errors import ExpiredTokenError  # noqa
 
-from rest_framework_fast.exceptions import TokenException
+from rest_framework_fast.conf import settings
 
 
 class TokenFactory:
-    ALLOWED_ALGO = ['HS256']
-    DEFAULT_LIFETIME = 60 * 60 * 24
-    LEEWAY_SECONDS = 60
 
     def __init__(self, secret_key: str = None, lifetime: Union[int, timedelta] = None):
         self.secret_key = self.get_secret_key(secret_key)
         self.lifetime = self.get_lifetime(lifetime)
         self.header = {
-            'alg': 'HS256'
+            'alg': settings.jwt_default_algo
         }
-        self._jwt = JsonWebToken(self.ALLOWED_ALGO)
+        self._jwt = JsonWebToken(settings.jwt_allowed_algo)
 
     def get_secret_key(self, secret_key: str = None) -> str:
         if not secret_key:
@@ -30,14 +28,14 @@ class TokenFactory:
 
     def get_lifetime(self, seconds: Union[int, timedelta] = None) -> timedelta:
         if not seconds:
-            seconds = self.DEFAULT_LIFETIME
+            seconds = settings.jwt_lifetime
 
         if isinstance(seconds, int):
             seconds = timedelta(seconds=seconds)
 
         return seconds
 
-    def encode(self, payload: dict) -> str:
+    def encode(self, payload: Dict[str, Any]) -> str:
         if not payload.get("exp", None):
             payload["exp"] = self.get_expired_time()
 
@@ -48,13 +46,11 @@ class TokenFactory:
         return token
 
     def decode(self, token: str):
-        try:
-            payload: Union[BaseClaims, JWTClaims] = self._jwt.decode(token, self.secret_key)
-            payload.validate()
-        except DecodeError:
-            raise TokenException()
-        else:
-            payload["exp"] = datetime.fromtimestamp(payload["exp"])
+        payload: Union[BaseClaims, JWTClaims] = self._jwt.decode(token, self.secret_key)
+        payload.validate(leeway=settings.jwt_leeway_seconds)
+        exp = payload.get("exp", None)
+        if exp and isinstance(exp, int):
+            payload["exp"] = datetime.fromtimestamp(exp)
 
         return payload
 
