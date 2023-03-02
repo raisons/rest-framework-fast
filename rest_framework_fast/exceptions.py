@@ -16,7 +16,7 @@ class BadRequest(APIException):
     default_detail = "Bad Request (400)"
 
 
-class TokenException(APIException):
-    status_code = status.HTTP_401_UNAUTHORIZED
-    default_code = "token_invalid"
-    default_detail = "Token Invalid"
+class ServerError(APIException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_code = 'server_error'
+    default_detail = 'Server error'
