@@ -8,6 +8,7 @@
 
 import base64
 import uuid
+import json
 from django.core.files.base import ContentFile
 from rest_framework import fields
 
@@ -39,3 +40,18 @@ class ImageField(Base64FieldMixin, fields.ImageField):
 
 class FileField(Base64FieldMixin, fields.FileField):
     pass
+
+
+class JSONField(fields.JSONField):
+    """
+    支持序列化的时候传入string参数，如果为True则序列化为字符串
+    """
+
+    def __init__(self, **kwargs):
+        self.string = kwargs.pop('string', False)
+        super().__init__(**kwargs)
+
+    def to_representation(self, value):
+        if self.string:
+            return json.dumps(value, cls=self.encoder)
+        return super().to_representation(value)
